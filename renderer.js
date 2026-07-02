@@ -1,5 +1,7 @@
-const panorama = new Image();
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
 
+const panorama = new Image();
 panorama.src = "panorama.jpg";
 
 let offsetX = 0;
@@ -19,15 +21,13 @@ panorama.onload = () => {
 
 function drawPanorama(){
 
-    if(!panorama.complete) return;
+    if(!panorama.complete || imageWidth === 0) return;
 
-    // udržujeme offset v rozsahu jednej šírky obrázka
     offsetX %= imageWidth;
 
     if(offsetX < 0)
         offsetX += imageWidth;
 
-    // začneme kresliť jednu šírku pred obrazovkou
     let start = -offsetX - imageWidth;
 
     while(start < canvas.width){
