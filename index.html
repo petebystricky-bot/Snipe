@@ -2,14 +2,198 @@
 <html lang="sk">
 <head>
 <meta charset="UTF-8">
-<title>TEST</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+
+body{
+    margin:0;
+    background:#111;
+    overflow:hidden;
+}
+
+/* HLAVNÝ VIEWER */
+.viewer{
+    width:100vw;
+    height:500px;
+    overflow:hidden;
+    position:relative;
+    cursor:grab;
+    touch-action:none;
+}
+
+/* PANORAMA TRACK */
+.track{
+    position:absolute;
+    top:0;
+    left:0;
+    display:flex;
+    height:100%;
+}
+
+.track img{
+    height:100%;
+    flex-shrink:0;
+    user-select:none;
+    -webkit-user-drag:none;
+    pointer-events:none;
+}
+
+.mirror{
+    transform:scaleX(-1);
+}
+
+/* 🔍 LUPA */
+.magnifier{
+    position:absolute;
+    left:50%;
+    top:50%;
+    transform:translate(-50%,-50%);
+    
+    width:50vw;          /* polovica šírky */
+    height:80%;          /* 4/5 výšky */
+    
+    overflow:hidden;
+    border:2px solid rgba(255,255,255,0.6);
+    box-shadow:0 10px 40px rgba(0,0,0,0.6);
+    pointer-events:none;
+}
+
+/* obsah lupy */
+.magnifier-inner{
+    position:absolute;
+    top:0;
+    left:0;
+    display:flex;
+    height:100%;
+}
+
+.magnifier-inner img{
+    height:100%;
+    flex-shrink:0;
+}
+
+</style>
+
 </head>
+<body>
 
-<body style="margin:0; background:green;">
+<div class="viewer" id="viewer">
 
-<h1 style="color:white;">
-AK VIDÍŠ TOTO, HTML FUNGUJE
-</h1>
+    <!-- HLAVNÁ PANORÁMA -->
+    <div class="track" id="track">
+        <img class="mirror" src="https://images.unsplash.com/photo-1666189125666-9733557dccad?q=80&w=2786&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA==">
+        <img src="https://images.unsplash.com/photo-1666189125666-9733557dccad?q=80&w=2786&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA==">
+        <img class="mirror" src="https://images.unsplash.com/photo-1666189125666-9733557dccad?q=80&w=2786&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA==">
+    </div>
+
+    <!-- LUPA -->
+    <div class="magnifier" id="magnifier">
+        <div class="magnifier-inner" id="magnifierInner">
+
+            <img class="mirror" src="https://TVOJ-OBRAZOK.jpg">
+            <img src="https://TVOJ-OBRAZOK.jpg">
+            <img class="mirror" src="https://TVOJ-OBRAZOK.jpg">
+
+        </div>
+    </div>
+
+</div>
+
+<script>
+
+const viewer = document.getElementById("viewer");
+const track = document.getElementById("track");
+const magInner = document.getElementById("magnifierInner");
+
+const imgs = track.querySelectorAll("img");
+
+let isDragging = false;
+let startX = 0;
+let startOffset = 0;
+
+let offset = 0;
+let imageWidth = 0;
+
+let magnifierScale = 2.2; // 🔍 zväčšenie
+
+imgs[1].onload = function(){
+
+    imageWidth = this.clientWidth;
+
+    offset = -imageWidth;
+    update();
+
+    setupMagnifier();
+
+}
+
+function setupMagnifier(){
+
+    magInner.style.transform = `scale(${magnifierScale})`;
+
+}
+
+function update(){
+
+    // nekonečný loop
+    while(offset <= -imageWidth*2){
+        offset += imageWidth;
+    }
+
+    while(offset >= 0){
+        offset -= imageWidth;
+    }
+
+    track.style.transform = `translateX(${offset}px)`;
+
+    // synchronizácia lupy
+    magInner.style.transform = `translateX(${offset}px) scale(${magnifierScale})`;
+
+}
+
+/* DRAG */
+viewer.addEventListener("mousedown",e=>{
+    isDragging = true;
+    startX = e.clientX;
+    startOffset = offset;
+});
+
+window.addEventListener("mouseup",()=>{
+    isDragging = false;
+});
+
+window.addEventListener("mousemove",e=>{
+    if(!isDragging) return;
+    offset = startOffset + (e.clientX - startX);
+    update();
+});
+
+/* TOUCH */
+viewer.addEventListener("touchstart",e=>{
+    isDragging = true;
+    startX = e.touches[0].clientX;
+    startOffset = offset;
+});
+
+viewer.addEventListener("touchend",()=>{
+    isDragging = false;
+});
+
+viewer.addEventListener("touchmove",e=>{
+    if(!isDragging) return;
+    offset = startOffset + (e.touches[0].clientX - startX);
+    update();
+});
+
+/* RESIZE */
+window.addEventListener("resize",()=>{
+    imageWidth = imgs[1].clientWidth;
+    offset = -imageWidth;
+    update();
+});
+
+</script>
 
 </body>
 </html>
