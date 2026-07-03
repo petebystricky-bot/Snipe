@@ -41,6 +41,8 @@
       box-shadow: 0 10px 35px rgba(0,0,0,0.35);
       user-select: none;
       z-index: 2;
+      max-height: calc(100vh - 32px);
+      overflow-y: auto;
     }
     .title {
       display: flex;
@@ -166,7 +168,7 @@
 
 <script>
 (() => {
-  const IMAGE_URL = "https://cdn.leonardo.ai/users/2cab3d46-dcc8-4e0e-9794-09d920c33a1e/generations/1f17633f-852e-6d70-b41a-4e7005b6dbf2/lucid-origin_a_cinematic_photo_of_Stitching_seamless_panorama_p[...]
+  const IMAGE_URL = "https://cdn.leonardo.ai/users/2cab3d46-dcc8-4e0e-9794-09d920c33a1e/generations/1f17633f-852e-6d70-b41a-4e7005b6dbf2/lucid-origin_a_cinematic_photo_of_Stitching_seamless_panorama_photo_of_wild_nature_photograph-0.jpg";
 
   const canvas = document.getElementById('glcanvas');
   const statusEl = document.getElementById('status');
@@ -214,8 +216,8 @@
   };
 
   let isZooming = false;
-  let zoomProgress = 0; // 0 = normálne, 1 = zoom
-  const zoomDuration = 150; // ms - dĺžka prechodu
+  let zoomProgress = 0;
+  const zoomDuration = 150;
 
   function updateLabels(useValues = null) {
     const vals = useValues || sliders;
@@ -241,7 +243,6 @@
   }
 
   function getInterpolatedValues(progress) {
-    // Easing: ease-in-out cubic
     const t = progress < 0.5 ? 4 * progress * progress * progress : 1 - Math.pow(-2 * progress + 2, 3) / 2;
     
     return {
@@ -331,7 +332,6 @@
       float blend = smoothstep(f - soft, f + soft, r);
       float mappedR = mix(inner, outer, blend);
 
-      // Jemná „očná" nelinearita aj v periférii:
       float t = clamp(mappedR / maxR, 0.0, 1.0);
       mappedR = mix(mappedR, pow(t, mix(0.82, 1.25, blend)) * maxR, 0.16);
 
@@ -339,7 +339,6 @@
       sampleP = aspectUnfix(sampleP);
       vec2 sampleUv = uCenter + sampleP;
 
-      // chromatická aberácia a peryferická mäkkosť podľa uBlur
       vec2 px = vec2(1.0 / uResolution.x, 1.0 / uResolution.y);
       float edge = smoothstep(0.25, 0.92, r / maxR);
 
@@ -355,7 +354,6 @@
         col = mix(c0, softCol, 0.12 * edge);
       }
 
-      // ztmavenie periférie podľa uVignette
       float vignette = smoothstep(1.05, 0.45, r / maxR);
       float vignetteIntensity = mix(0.90, 1.0 - uVignette * 0.5, vignette);
       col *= vignetteIntensity;
@@ -488,7 +486,6 @@
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, texture);
 
-    // Rovnomerné obmedzenie max textúry ak je obraz veľmi veľký.
     const maxDim = 4096;
     const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
     let source = img;
@@ -520,7 +517,6 @@
   function render(t) {
     resize();
 
-    // Animácia zoom prechodu
     if (isZooming) {
       const elapsed = t - state.lastZoomTime;
       if (state.lastZoomTime === 0) {
