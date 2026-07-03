@@ -100,6 +100,10 @@
     .error {
       color: #ffd0d0;
     }
+    .zoom-mode {
+      color: #8bd3ff;
+      font-weight: 600;
+    }
   </style>
 </head>
 <body>
@@ -107,53 +111,66 @@
 
   <div class="panel">
     <div class="title">
-      <h1>Realistická „ľudská“ lupa</h1>
+      <h1>Realistická „ľudská" lupa</h1>
       <div class="status" id="status">Načítavam obrázok…</div>
     </div>
 
     <div class="row">
       <label for="fovea">Foveálna oblasť</label>
-      <output id="foveaOut">0.20</output>
-      <input id="fovea" type="range" min="0.06" max="0.36" value="0.20" step="0.01">
+      <output id="foveaOut">0.36</output>
+      <input id="fovea" type="range" min="0.06" max="0.36" value="0.36" step="0.01">
     </div>
 
     <div class="row">
       <label for="magnify">Zväčšenie stredu</label>
-      <output id="magnifyOut">1.85×</output>
-      <input id="magnify" type="range" min="1.00" max="3.00" value="1.85" step="0.01">
+      <output id="magnifyOut">1.08×</output>
+      <input id="magnify" type="range" min="1.00" max="50.00" value="1.08" step="0.01">
     </div>
 
     <div class="row">
       <label for="compress">Kompresia periférie</label>
-      <output id="compressOut">0.72</output>
-      <input id="compress" type="range" min="0.35" max="1.00" value="0.72" step="0.01">
+      <output id="compressOut">1.00</output>
+      <input id="compress" type="range" min="0.00" max="1.50" value="1.00" step="0.01">
     </div>
 
     <div class="row">
       <label for="softness">Mäkkosť prechodu</label>
-      <output id="softnessOut">0.06</output>
-      <input id="softness" type="range" min="0.00" max="0.18" value="0.06" step="0.01">
+      <output id="softnessOut">0.18</output>
+      <input id="softness" type="range" min="0.00" max="0.25" value="0.18" step="0.01">
     </div>
 
     <div class="row">
       <label for="follow">Zotrvačnosť pohybu</label>
-      <output id="followOut">0.18</output>
-      <input id="follow" type="range" min="0.02" max="0.40" value="0.18" step="0.01">
+      <output id="followOut">0.12</output>
+      <input id="follow" type="range" min="0.02" max="0.40" value="0.12" step="0.01">
+    </div>
+
+    <div class="row">
+      <label for="vignette">Ztmavenie periférie</label>
+      <output id="vignetteOut">0.20</output>
+      <input id="vignette" type="range" min="0.00" max="1.00" value="0.20" step="0.01">
+    </div>
+
+    <div class="row">
+      <label for="blur">Rozmazanie periférie</label>
+      <output id="blurOut">0.25</output>
+      <input id="blur" type="range" min="0.00" max="0.50" value="0.25" step="0.01">
     </div>
 
     <div class="footer">
       <span class="pill">myš / dotyk</span>
       <span class="pill">WebGL shader</span><br>
-      Presuň kurzor nad obraz. Ak server neumožní CORS, obrázok sa nenačíta kvôli obmedzeniu prehliadača.
+      <span id="zoomInfo">Presuň kurzor nad obraz a <strong>drž tlačidlo myši</strong> pre zoom. Ak server neumožní CORS, obrázok sa nenačíta kvôli obmedzeniu prehliadača.</span>
     </div>
   </div>
 
 <script>
 (() => {
-  const IMAGE_URL = "https://cdn.leonardo.ai/users/2cab3d46-dcc8-4e0e-9794-09d920c33a1e/generations/1f17633f-852e-6d70-b41a-4e7005b6dbf2/lucid-origin_a_cinematic_photo_of_Stitching_seamless_panorama_photo_of_wild_nature_photograph-0.jpg";
+  const IMAGE_URL = "https://cdn.leonardo.ai/users/2cab3d46-dcc8-4e0e-9794-09d920c33a1e/generations/1f17633f-852e-6d70-b41a-4e7005b6dbf2/lucid-origin_a_cinematic_photo_of_Stitching_seamless_panorama_p[...]
 
   const canvas = document.getElementById('glcanvas');
   const statusEl = document.getElementById('status');
+  const zoomInfoEl = document.getElementById('zoomInfo');
 
   const sliders = {
     fovea: document.getElementById('fovea'),
@@ -161,6 +178,8 @@
     compress: document.getElementById('compress'),
     softness: document.getElementById('softness'),
     follow: document.getElementById('follow'),
+    vignette: document.getElementById('vignette'),
+    blur: document.getElementById('blur'),
   };
   const outs = {
     fovea: document.getElementById('foveaOut'),
@@ -168,15 +187,84 @@
     compress: document.getElementById('compressOut'),
     softness: document.getElementById('softnessOut'),
     follow: document.getElementById('followOut'),
+    vignette: document.getElementById('vignetteOut'),
+    blur: document.getElementById('blurOut'),
   };
 
-  function updateLabels() {
-    outs.fovea.textContent = Number(sliders.fovea.value).toFixed(2);
-    outs.magnify.textContent = Number(sliders.magnify.value).toFixed(2) + "×";
-    outs.compress.textContent = Number(sliders.compress.value).toFixed(2);
-    outs.softness.textContent = Number(sliders.softness.value).toFixed(2);
-    outs.follow.textContent = Number(sliders.follow.value).toFixed(2);
+  // Pôvodné hodnoty
+  const originalValues = {
+    fovea: 0.36,
+    magnify: 1.08,
+    compress: 1.00,
+    softness: 0.18,
+    follow: 0.12,
+    vignette: 0.20,
+    blur: 0.25,
+  };
+
+  // Zoom mode hodnoty
+  const zoomValues = {
+    fovea: 0.22,
+    magnify: 50.00,
+    compress: 0.00,
+    softness: 0.00,
+    follow: 0.40,
+    vignette: 1.00,
+    blur: 0.25,
+  };
+
+  let isZooming = false;
+  let zoomProgress = 0; // 0 = normálne, 1 = zoom
+  const zoomDuration = 150; // ms - dĺžka prechodu
+
+  function updateLabels(useValues = null) {
+    const vals = useValues || sliders;
+    outs.fovea.textContent = Number(vals.fovea.value || vals.fovea).toFixed(2);
+    outs.magnify.textContent = Number(vals.magnify.value || vals.magnify).toFixed(2) + "×";
+    outs.compress.textContent = Number(vals.compress.value || vals.compress).toFixed(2);
+    outs.softness.textContent = Number(vals.softness.value || vals.softness).toFixed(2);
+    outs.follow.textContent = Number(vals.follow.value || vals.follow).toFixed(2);
+    outs.vignette.textContent = Number(vals.vignette.value || vals.vignette).toFixed(2);
+    outs.blur.textContent = Number(vals.blur.value || vals.blur).toFixed(2);
   }
+
+  function applyZoomMode() {
+    isZooming = true;
+    zoomProgress = 0;
+    zoomInfoEl.innerHTML = '<span class="zoom-mode">🔍 ZOOM MODE AKTÍVNY</span>';
+  }
+
+  function restoreOriginalValues() {
+    isZooming = false;
+    zoomProgress = 1;
+    zoomInfoEl.textContent = 'Presuň kurzor nad obraz a drž tlačidlo myši pre zoom. Ak server neumožní CORS, obrázok sa nenačíta kvôli obmedzeniu prehliadača.';
+  }
+
+  function getInterpolatedValues(progress) {
+    // Easing: ease-in-out cubic
+    const t = progress < 0.5 ? 4 * progress * progress * progress : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+    
+    return {
+      fovea: originalValues.fovea + (zoomValues.fovea - originalValues.fovea) * t,
+      magnify: originalValues.magnify + (zoomValues.magnify - originalValues.magnify) * t,
+      compress: originalValues.compress + (zoomValues.compress - originalValues.compress) * t,
+      softness: originalValues.softness + (zoomValues.softness - originalValues.softness) * t,
+      follow: originalValues.follow + (zoomValues.follow - originalValues.follow) * t,
+      vignette: originalValues.vignette + (zoomValues.vignette - originalValues.vignette) * t,
+      blur: originalValues.blur + (zoomValues.blur - originalValues.blur) * t,
+    };
+  }
+
+  function updateSliderValues(values) {
+    sliders.fovea.value = values.fovea;
+    sliders.magnify.value = values.magnify;
+    sliders.compress.value = values.compress;
+    sliders.softness.value = values.softness;
+    sliders.follow.value = values.follow;
+    sliders.vignette.value = values.vignette;
+    sliders.blur.value = values.blur;
+  }
+
   Object.values(sliders).forEach(el => el.addEventListener('input', updateLabels));
   updateLabels();
 
@@ -205,6 +293,8 @@
     uniform float uMagnify;
     uniform float uCompress;
     uniform float uSoftness;
+    uniform float uVignette;
+    uniform float uBlur;
     uniform float uTime;
 
     vec2 aspectFix(vec2 p) {
@@ -236,12 +326,12 @@
       float soft = max(uSoftness, 0.0001);
 
       float inner = r / max(uMagnify, 1.0001);
-      float outer = f / max(uMagnify, 1.0001) + (r - f) * clamp(uCompress, 0.01, 1.0);
+      float outer = f / max(uMagnify, 1.0001) + (r - f) * clamp(uCompress, 0.01, 1.5);
 
       float blend = smoothstep(f - soft, f + soft, r);
       float mappedR = mix(inner, outer, blend);
 
-      // Jemná „očná“ nelinearita aj v periférii:
+      // Jemná „očná" nelinearita aj v periférii:
       float t = clamp(mappedR / maxR, 0.0, 1.0);
       mappedR = mix(mappedR, pow(t, mix(0.82, 1.25, blend)) * maxR, 0.16);
 
@@ -249,7 +339,7 @@
       sampleP = aspectUnfix(sampleP);
       vec2 sampleUv = uCenter + sampleP;
 
-      // veľmi jemná chromatická aberácia a peryferická mäkkosť
+      // chromatická aberácia a peryferická mäkkosť podľa uBlur
       vec2 px = vec2(1.0 / uResolution.x, 1.0 / uResolution.y);
       float edge = smoothstep(0.25, 0.92, r / maxR);
 
@@ -257,7 +347,7 @@
       if (edge < 0.08) {
         col = sampleTexture(sampleUv);
       } else {
-        float a = 0.0015 * edge;
+        float a = 0.0015 * edge * uBlur * 0.25;
         vec3 c0 = texture2D(uTexture, sampleUv).rgb;
         vec3 cr = texture2D(uTexture, sampleUv + vec2(a, 0.0)).rgb;
         vec3 cb = texture2D(uTexture, sampleUv - vec2(a, 0.0)).rgb;
@@ -265,9 +355,10 @@
         col = mix(c0, softCol, 0.12 * edge);
       }
 
-      // vineta len veľmi jemne, aby obraz pôsobil „kukátkovo“
+      // ztmavenie periférie podľa uVignette
       float vignette = smoothstep(1.05, 0.45, r / maxR);
-      col *= mix(0.90, 1.04, vignette);
+      float vignetteIntensity = mix(0.90, 1.0 - uVignette * 0.5, vignette);
+      col *= vignetteIntensity;
 
       gl_FragColor = vec4(col, 1.0);
     }
@@ -328,6 +419,8 @@
     uMagnify: gl.getUniformLocation(program, 'uMagnify'),
     uCompress: gl.getUniformLocation(program, 'uCompress'),
     uSoftness: gl.getUniformLocation(program, 'uSoftness'),
+    uVignette: gl.getUniformLocation(program, 'uVignette'),
+    uBlur: gl.getUniformLocation(program, 'uBlur'),
     uTime: gl.getUniformLocation(program, 'uTime'),
   };
 
@@ -346,6 +439,7 @@
     targetX: 0.5,
     targetY: 0.5,
     loaded: false,
+    lastZoomTime: 0,
   };
 
   function resize() {
@@ -371,7 +465,14 @@
   }
 
   canvas.addEventListener('pointermove', setTargetFromEvent, { passive: true });
-  canvas.addEventListener('pointerdown', setTargetFromEvent, { passive: true });
+  
+  canvas.addEventListener('pointerdown', (ev) => {
+    setTargetFromEvent(ev);
+    applyZoomMode();
+  }, { passive: true });
+
+  canvas.addEventListener('pointerup', restoreOriginalValues, { passive: true });
+  canvas.addEventListener('pointerleave', restoreOriginalValues, { passive: true });
 
   function loadImage(url) {
     return new Promise((resolve, reject) => {
@@ -413,14 +514,36 @@
   }).catch(err => {
     console.error(err);
     statusEl.innerHTML = '<span class="error">Obrázok sa nenačítal.</span>';
-    const footer = document.querySelector('.footer');
-    footer.innerHTML = 'Pre CORS problém skús uložiť obrázok lokálne alebo na vlastný server s povoleným <code>Access-Control-Allow-Origin</code>.';
+    zoomInfoEl.innerHTML = 'Pre CORS problém skús uložiť obrázok lokálne alebo na vlastný server s povoleným <code>Access-Control-Allow-Origin</code>.';
   });
 
   function render(t) {
     resize();
 
-    const follow = parseFloat(sliders.follow.value);
+    // Animácia zoom prechodu
+    if (isZooming) {
+      const elapsed = t - state.lastZoomTime;
+      if (state.lastZoomTime === 0) {
+        state.lastZoomTime = t;
+      }
+      zoomProgress = Math.min(1, elapsed / zoomDuration);
+    } else {
+      const elapsed = t - state.lastZoomTime;
+      if (state.lastZoomTime === 0) {
+        state.lastZoomTime = t;
+      }
+      zoomProgress = Math.max(0, 1 - (elapsed / zoomDuration));
+    }
+
+    if ((isZooming && zoomProgress === 1) || (!isZooming && zoomProgress === 0)) {
+      state.lastZoomTime = 0;
+    }
+
+    const currentValues = getInterpolatedValues(zoomProgress);
+    updateSliderValues(currentValues);
+    updateLabels(currentValues);
+
+    const follow = currentValues.follow;
     state.centerX += (state.targetX - state.centerX) * follow;
     state.centerY += (state.targetY - state.centerY) * follow;
 
@@ -430,10 +553,12 @@
 
     gl.uniform2f(uniforms.uResolution, canvas.width, canvas.height);
     gl.uniform2f(uniforms.uCenter, state.centerX, state.centerY);
-    gl.uniform1f(uniforms.uFovea, parseFloat(sliders.fovea.value));
-    gl.uniform1f(uniforms.uMagnify, parseFloat(sliders.magnify.value));
-    gl.uniform1f(uniforms.uCompress, parseFloat(sliders.compress.value));
-    gl.uniform1f(uniforms.uSoftness, parseFloat(sliders.softness.value));
+    gl.uniform1f(uniforms.uFovea, currentValues.fovea);
+    gl.uniform1f(uniforms.uMagnify, currentValues.magnify);
+    gl.uniform1f(uniforms.uCompress, currentValues.compress);
+    gl.uniform1f(uniforms.uSoftness, currentValues.softness);
+    gl.uniform1f(uniforms.uVignette, currentValues.vignette);
+    gl.uniform1f(uniforms.uBlur, currentValues.blur);
     gl.uniform1f(uniforms.uTime, t * 0.001);
 
     gl.drawArrays(gl.TRIANGLES, 0, 6);
